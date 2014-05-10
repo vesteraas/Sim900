@@ -6,10 +6,8 @@
 #ifndef __Sim900__Sim900__
 #define __Sim900__Sim900__
 
-#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <assert.h>
 
 typedef enum { CREG, CMGR, CMGL } CMD;
 
