@@ -1,5 +1,5 @@
 /*
- * Send an SMS to the Sim900, and it will send the same message back to the sender
+ * Send an SMS to the Sim900, and it will call the number it received the SMS from
  */
 #include <SoftwareSerial.h>
 #include <Sim900.h>
@@ -31,7 +31,7 @@ void noCarrierHandler() {
 // An SMS is received
 void smsHandler(char *from, char *message) {
   Serial.println("SMS received");
-  sim900.sendSMS(from, message;
+  sim900.call(from);
 }
 
 // The Sim900 want to send a character to the modem
@@ -42,10 +42,6 @@ void sendCharToSerial(char c) {
 void setup() {
   Serial.begin(9600);
   mySerial.begin(19200);
-  
-  // SMS'es will be in text format
-  mySerial.println("AT+CMGF=1\r\n");
-  delay(100);
 
   // Set callback handlers
   sim900.setCallReadyHandler(&callReadyHandler);
