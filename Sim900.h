@@ -9,8 +9,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-typedef enum { CREG, CMGR, CMGL } CMD;
-
 class Sim900 {
 private:
     bool powered;
