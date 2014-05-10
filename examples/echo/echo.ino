@@ -31,7 +31,7 @@ void noCarrierHandler() {
 // An SMS is received
 void smsHandler(char *from, char *message) {
   Serial.println("SMS received");
-  sim900.sendSMS(from, message;
+  sim900.sendSMS(from, message);
 }
 
 // The Sim900 want to send a character to the modem
