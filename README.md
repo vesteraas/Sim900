@@ -1,7 +1,7 @@
 # Arduino Sim900 Library #
 This library is written for any Arduino shield equipped with a SIM900 Quad-band GSM/GPRS module.
 
-See the examples for usage.
+See the examples for usage.  You may need to modify them to match your SIM900's current baud rate.
 
 ## Download ##
 Click the **Download Zip** button to the right
