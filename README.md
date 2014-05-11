@@ -1,5 +1,5 @@
 # Arduino Sim900 Library #
-This library is written for any Arduino shield equipped with a SIM900 Quad-band GSM/GPRS module.  Events from the unit is sendt to your sketch via callback functions.  Sending AT commands to the unit should be done with the **sendATCommand()** function.  This function will only return true if the unit responds with 'OK' as its first response.  The function should not be used with commands that doesn't return 'OK' or 'ERROR' as its first response.
+This library is written for any Arduino shield equipped with a SIM900 Quad-band GSM/GPRS module.  Events from the unit is sendt to your sketch via callback functions.  Sending AT commands to the unit should be done with the **sendATCommand()** function.  This function will only return true if the unit responds with **OK** as its first response.  The function should not be used with commands that doesn't return **OK** or **ERROR** as its first response.
 
 ### Examples ###
 You may need to modify **mySerial.begin()** under **setup()** to match your SIM900's current baud rate.
