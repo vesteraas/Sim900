@@ -6,6 +6,7 @@
 #ifndef __Sim900__Sim900__
 #define __Sim900__Sim900__
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -15,10 +16,10 @@ private:
     bool ready;
     bool okReceived;
     bool errorReceived;
-    
-    bool messageSent;
-    
-    char *buffer;
+
+    char *parseBuffer;
+    char *commandBuffer;
+    char *callerId;
     char *lastSMSText;
     char *lastSMSFrom;
     char *messageToSend;
@@ -26,15 +27,16 @@ private:
     void process_char(char c);
     bool prefix(const char *pre, const char *str);
     void process_line(char *line);
-    char** split(const char* input);
+    char** split(const char *input);
     void send(const char *str);
     
     void (*onCallReady)();
     void (*onPowerDown)();
-    void (*onRing)();
+    void (*onRing)(char *);
     void (*onNoCarrier)();
-    void (*onSMS)(char*, char*);
+    void (*onSMS)(char *, char *);
     void (*sendChar)(char);
+    char (*receiveChar)();
     
 public:
     Sim900(void);
@@ -42,13 +44,17 @@ public:
     
     void setCallReadyHandler(void (*onCRDY)());
     void setPowerDownHandler(void (*onPWRDWN)());
-    void setRingHandler(void (*onRING)());
+    void setRingHandler(void (*onRING)(char *));
     void setNoCarrierHandler(void (*onNoCarrier)());
-    void setSMSHandler(void (*onSMS)(char*, char*));
+    void setSMSHandler(void (*onSMS)(char *, char *));
     void setSendCharToSerial(void (*sendChar)(char));
+    void setReceiveCharFromSerial(char (*receiveChar)());
     
     bool call(char *recipient);
-    bool sendSMS(char* receiver, char* message);
+    bool hangup();
+    bool answer();
+    bool sendSMS(char *receiver, char *message);
+    bool sendATCommand(const char *command);
     
     void parse(char character);
 };

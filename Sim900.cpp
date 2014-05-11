@@ -11,21 +11,22 @@ Sim900::Sim900(void) {
     okReceived = false;
     errorReceived = false;
     
-    messageSent = false;
-    
-    buffer = (char *)malloc(128 * sizeof(char));
+    parseBuffer = (char *)malloc(128 * sizeof(char));
+    commandBuffer = (char *)malloc(128 * sizeof(char));
+    callerId = (char *)malloc((15 + 1) * sizeof(char));
     lastSMSText = (char *)malloc((160 + 1) * sizeof(char));
     lastSMSFrom = (char *)malloc((15 + 1) * sizeof(char));
 }
 
 Sim900::~Sim900() {
-    free(buffer);
+    free(parseBuffer);
+    free(commandBuffer);
     free(lastSMSText);
     free(lastSMSFrom);
 }
 
 void Sim900::process_char(char character) {
-    static char str[2];
+    char str[2];
     static char lastCharacter;
     static char countSinceLastCRLF;
     
@@ -35,19 +36,19 @@ void Sim900::process_char(char character) {
     
     if (character=='\n' && lastCharacter=='\r') { // Are we at a CRLF boundary?
         countSinceLastCRLF = 0;
-        buffer[strlen(buffer) - 1] = '\0'; // Strip CLRLF
+        parseBuffer[strlen(parseBuffer) - 1] = '\0'; // Strip CLRLF
         
-        if (strlen(buffer) > 0) { // Don't bother sending empty strings
-            char *line = (char *)malloc((strlen(buffer) + 1) * sizeof(char));
-            strcpy(line, buffer);
+        if (strlen(parseBuffer) > 0) { // Don't bother sending empty strings
+            char *line = (char *)malloc((strlen(parseBuffer) + 1) * sizeof(char));
+            strcpy(line, parseBuffer);
             process_line(line);
             free(line);
         }
         
-        buffer[0] = '\0'; // Clear buffer
+        parseBuffer[0] = '\0'; // Clear buffer
     } else {
         countSinceLastCRLF++;
-        strcat(buffer, str); // Append to buffer;
+        strcat(parseBuffer, str); // Append to buffer;
     }
     
     if (character==' ' && lastCharacter=='>' && countSinceLastCRLF == 2) { // Prompt to send message received
@@ -72,14 +73,26 @@ void Sim900::process_line(char *line) {
         smsReceived = true;
         powered = true;
         
-        char *tmp = (char *)malloc((strlen(line) - 6) * sizeof(char));
+        char *tmp = (char *)malloc((strlen(line) - 6 + 1) * sizeof(char));
         
-        memcpy(tmp, &line[6], strlen(line) - 6);
+        memcpy(tmp, &line[6], strlen(line) - 6 + 1);
         
         char **sms = split(tmp);
         
         strcpy(lastSMSFrom, sms[0]);
         free(sms);
+        free(tmp);
+    } else if (prefix("+CLIP: ", line)) {
+        powered = true;
+        char *tmp = (char *)malloc((strlen(line) - 7 + 1) * sizeof(char));
+        
+        memcpy(tmp, &line[7], strlen(line) - 7 + 1);
+        
+        char **clip = split(tmp);
+        
+        strcpy(callerId, clip[0]);
+        
+        free(clip);
         free(tmp);
     } else {
         if (strncmp(line, "OK", 2) == 0) {
@@ -95,7 +108,11 @@ void Sim900::process_line(char *line) {
             errorReceived = true;
             powered = true;
             if (onRing) {
-                onRing();
+                if (callerId && callerId[0] == '\0') {
+                    onRing(NULL);
+                } else {
+                    onRing(callerId);
+                }
             }
         } else if (strncmp(line, "NO CARRIER", 10) == 0) {
             okReceived = false;
@@ -138,8 +155,8 @@ void Sim900::process_line(char *line) {
     }
 }
 
-char** Sim900::split(const char* input) {
-    const char* _input;
+char** Sim900::split(const char *input) {
+    const char *_input;
     
     _input = input;
     
@@ -162,14 +179,14 @@ char** Sim900::split(const char* input) {
         input++;
     }
     
-    char **result = (char **)malloc(ec * sizeof(char*));
+    char **result = (char **)malloc(ec * sizeof(char *));
     
     input = _input;
     
     in_quote=0;
     ec = 0;
     
-    char* part = (char *)malloc(64);
+    char *part = (char *)malloc(64);
     strcpy(part, "");
     
     while (*input) {
@@ -225,7 +242,7 @@ void Sim900::setPowerDownHandler(void (*onPowerDown)()) {
     this->onPowerDown = onPowerDown;
 }
 
-void Sim900::setRingHandler(void (*onRing)()) {
+void Sim900::setRingHandler(void (*onRing)(char *)) {
     this->onRing = onRing;
 }
 
@@ -241,6 +258,10 @@ void Sim900::setSendCharToSerial(void (*sendChar)(char)) {
     this->sendChar = sendChar;
 }
 
+void Sim900::setReceiveCharFromSerial(char (*receiveChar)()) {
+    this->receiveChar = receiveChar;
+}
+
 bool Sim900::call(char *recipient) {
     if (powered) {
         send("ATD");
@@ -253,7 +274,28 @@ bool Sim900::call(char *recipient) {
     }
 }
 
-bool Sim900::sendSMS(char* receiver, char* message) {
+bool Sim900::hangup() {
+    if (powered) {
+        send("ATH\r\n");
+        
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool Sim900::answer() {
+    if (powered) {
+        send("ATA\r\n");
+        
+        return true;
+    } else {
+        return false;
+    }
+}
+
+
+bool Sim900::sendSMS(char *receiver, char *message) {
     this->messageToSend = message;
     if (powered) {
         send("AT+CMGS=\"");
@@ -263,6 +305,34 @@ bool Sim900::sendSMS(char* receiver, char* message) {
     } else {
         return false;
     }
+}
+
+bool Sim900::sendATCommand(const char *command) {
+    commandBuffer[0] = '\0';
+    
+    send(command);
+    send("\r\n");
+
+    do {
+        char received = receiveChar();
+        
+        if (received) {
+            char str[2];
+            
+            str[0] = received;
+            str[1] = '\0';
+            
+            strcat(commandBuffer, str);
+            
+            if (strncmp(commandBuffer, "\r\nOK\r\n", 6) == 0) {
+                return true;
+            } else if (strncmp(commandBuffer, "\r\nERROR\r\n", 9) == 0) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    } while(true);
 }
 
 void Sim900::parse(char c) {
